@@ -60,7 +60,8 @@ See the included `docker-compose.yml` and `docker-compose.copies.yml` for exampl
 Steam will be able to see your game sessions through the server browser if you add it to favorites but it will only see around 6 of the
 maps for some reason. Players will be able to see all your maps from within Ark at an Obelisk and if you add all servers to your favorites
 there should be no issue. For example, I had to add `my.domain:27015`, `my.domain:27016`, etc. for all my game maps in order to login to a
-specific map.
+specific map. I've read some guides that say port 27020-27050 are used by steam and cannot be used for your Ark server but I believe this is
+very misleading because you can use those ports just not on a desktop machine that is also running the steam client.
 
 ## Non-Root
 This image runs as a non-root user and you will need to specify the `user` (`--user`) option in docker. If you really want to run
