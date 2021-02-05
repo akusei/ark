@@ -1,0 +1,138 @@
+#!/bin/bash
+
+ARK_SERVER=/server/ShooterGame/Binaries/Linux/ShooterGameServer
+
+# Check for the only 2 required env vars
+[[ -z ${MAP_NAME} ]] && echo "Environment variable MAP_NAME is required" && exit 1
+[[ -z ${SESSION_NAME} ]] && echo "Environment variable SESSION_NAME is required" && exit 1
+
+# Instead of using chown and because this image is running as non-root,
+# test if the mounted volume is writable
+if ! touch "/server/.${HOSTNAME}-writetest" &> /dev/null; then
+  echo "ERROR: Volume mounted at /server is not writable by user $(id -u):$(id -g)"
+  exit 1
+else
+  rm -rf "/server/.${HOSTNAME}-writetest"
+fi
+
+# Function used to add Steam64 IDs to the whitelist and admincheat files
+function addToList()
+{
+  declare list=${1} file=${2}
+
+  if [[ ! -z ${list:-} ]]; then
+    mkdir -p "$(dirname "${file}")"
+    for user in ${list//,/ }; do
+      if ! grep -q "${user}" "${file}" 2> /dev/null; then
+        echo ${user} >> "${file}"
+      fi
+    done
+  fi
+}
+
+# If the container does not have MAIN_NODE defined or BYPASS_MAIN_NODE is true,
+# do the server configuration, steam download, game initialization
+if [[ -z ${MAIN_NODE} || ${BYPASS_MAIN_NODE,,} == 'true' ]]; then
+  STEAM_LOCATION=/server/Engine/Binaries/ThirdParty/SteamCMD/Linux
+  WHITELIST_FILE=/server/ShooterGame/Binaries/Linux/PlayersJoinNoCheckList.txt
+  OPS_FILE=/server/ShooterGame/Saved/AllowedCheaterSteamIDs.txt
+  SAVED_ARK=/server/ShooterGame/Saved/Config/LinuxServer
+
+  mkdir -p "${STEAM_LOCATION}"
+
+  # if steam isn't installed, download it and set exec bit
+  if [[ ! -f ${STEAM_LOCATION}/steamcmd.sh ]]; then
+    echo "Installing SteamCMD"
+    pushd "${STEAM_LOCATION}" &> /dev/null
+
+    curl -s -o /tmp/steam.tgz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+    tar -zvxf /tmp/steam.tgz
+    rm -rf /tmp/steam.tgz
+
+    chmod a+x ./steamcmd.sh
+
+    popd &> /dev/null
+  fi
+
+  # add all specified users to whitelist file and admincheat file
+  addToList "${WHITELIST:-}" "${WHITELIST_FILE}"
+  addToList "${OPERATORS:-}" "${OPS_FILE}"
+
+  # this will ensure mods are added or removed fromthe game ini even if more
+  # are added in the MODS env var later, or removed
+  mkdir -p "${SAVED_ARK}"
+  [[ ! -f ${SAVED_ARK}/GameUserSettings.ini ]] && touch "${SAVED_ARK}/GameUserSettings.ini"
+  if grep -q ^ActiveMods=.*$ "${SAVED_ARK}/GameUserSettings.ini"; then
+    sed -i -e "/^ActiveMods=/s/=.*/=${MODS:-}/" "${SAVED_ARK}/GameUserSettings.ini"
+  else
+    if ! grep -q "[ServerSettings]" "${SAVED_ARK}/GameUserSettings.ini"; then
+      echo "[ServerSettings]" >> "${SAVED_ARK}/GameUserSettings.ini"
+    fi
+    sed -i -e "/\[ServerSettings\]/a ActiveMods=${MODS:-}" "${SAVED_ARK}/GameUserSettings.ini"
+  fi
+
+  # install steam for the first time, otherwise download ark, mods and
+  # any updates
+  echo "Installing/Updating SteamCMD and Ark Server"
+  pushd "${STEAM_LOCATION}" &> /dev/null
+
+  ./steamcmd.sh +login anonymous +force_install_dir /server +app_update 376030 +quit
+
+  # link steamapps so Ark doesn't get confused
+  if [[ ! -d ${STEAM_LOCATION}/steamapps ]]; then
+    ln -s Steam/steamapps steamapps
+  fi
+
+  popd &> /dev/null
+
+  [[ ! (-z ${MODS} && -z ${MAIN_NODE}) || ${BYPASS_MAIN_NODE,,} == 'true' ]] && doMods=-automanagedmods
+else
+  # wait for the main node to become ready before starting
+  # this ensures no mods or binaries are clobbered
+  IFS=':'
+  read -a nodeInfo <<< "${MAIN_NODE}"
+  unset IFS
+  port=${nodeInfo[1]:-27015}
+
+  echo "waiting for main node to come online [${nodeInfo[0]}:${port}]"
+  echo "If you have a container stuck at this point, make sure you set"
+  echo "the main node and port if different from the default of 27015"
+
+  while :; do
+    (echo -n -e \\xFF\\xFF\\xFF\\xFFTSource Engine Query\\x00\\xFF | \
+      nc -u ${nodeInfo[0]} ${port} > /tmp/data.bin 2> /dev/null) &
+    pid=$!
+    disown
+
+    sleep 3s
+
+    kill -9 ${pid} &> /dev/null
+    wait ${pid} &> /dev/null
+
+    if grep -q "ARK: Survival Evolved" /tmp/data.bin; then
+      break
+    fi
+  done
+
+  rm -f /tmp/data.bin
+fi
+
+# Server Options
+[[ -z ${OPT_AltSaveDirectoryName} ]] && export OPT_AltSaveDirectoryName="${MAP_NAME}"
+for opt in $(env | grep OPT_); do
+  env_name=$(echo "${opt}" | cut -d '=' -f 1)
+  name=$(echo "${env_name}" | cut -d '_' -f 2)
+  cliOpts="${cliOpts:-}?${name}=${!env_name}"
+done
+
+[[ ! -z ${EXCLUSIVE_JOIN} ]] && doWhitelist=-exclusivejoin
+[[ ! -z ${CLUSTER_ID} ]] && doCluster="-clusterid=${CLUSTER_ID}"
+
+
+echo "Running Server"
+cd /server/ShooterGame/Binaries/Linux
+
+exec "${ARK_SERVER}" \
+  ${MAP_NAME}?listen?SessionName="${SESSION_NAME}"${cliOpts:-} \
+  ${doWhitelist:-} ${doMods:-} -server -NoTransferFromFiltering \
+  -ClusterDirOverride=/server ${doCluster:-} "$@"
