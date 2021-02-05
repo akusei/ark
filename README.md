@@ -31,6 +31,7 @@ There are 2 ways to run this image:
 
 1. **SHARED**: As a cluster sharing ini files and all binaries. This will keep the deployment size
 much smaller as well as only downloading 1 set of binaries
+
 1. **CHONKY**: As a cluster with individual ini files and a copy of all binaries. This will
 significantly increase the size of your deployment and eat up a lot of bandwidth while
 the binaries download. Use this only if you have a need for individual game settings per map
@@ -40,39 +41,20 @@ See the included `docker-compose.yml` and `docker-compose.copies.yml` for exampl
 
 ## Environment Variables
 
-**CLUSTER_ID**: This will be your cluster ID and must be the same for all instances (optional)
-
-**SESSION_NAME**: The session name for your cluster/server, this will show in the server browser (required)
-
-**MAP_NAME**: The map to run on the server (required)
-
-**MAIN_NODE**: The `container name` of the main server node which will handle all downloading
-and initial configuration. This is optional for `CHONKY` mode but required for
-`SHARED` mode. All instances will need this variable set **except** the actual main node (optional/required)
-
-**MODS**: A comma delimited list of mods to add to the cluster. Only the main node needs this
-defined in `SHARED` mode but all instances need this in `CHONKY` mode (optional)
-
-**OPERATORS**: A comma delimited list of [Steam64 IDs](https://steamid.io/) for users you want to have admin access (optional)
-
-**WHITELIST**: A comma delimited list of [Steam64 IDs](https://steamid.io/) for users you want to access your servers.
-By itself this does not do anything but allow people to bypass login queues, use this combined with `EXCLUSIVE_JOIN` to
-lock your server down to only allow certain players to login (optional)
-
-**EXCLUSIVE_JOIN**: Set to `'true'` to make your server only accessible to users you specify in `WHITELIST` (optional)
-
-**OPT_***: [? command line arguments](https://ark.gamepedia.com/Server_Configuration#Command_line_arguments) to pass to the ark server on the command line. For example, to specify the option `?NonPermanentDiseases` you would add `OPT_NonPermanentDiseases` to your
-environment variables (optional)
-
-**OPT_Port**: This is a special OPT variable that is required when running multiple instances on the same physical server.
-This *UDP* port should initially be `7777` and increment by 2 for each additional server. For example, if you have 3 servers your
-OPT_Port variable would be set to `7777`, `7779`, and `77781`. Don't forget to map your ports if using bridge mode in docker (optional/required)
-
-**OPT_QueryPort**: *UDP* Port used for the steam server browser and discovery. This is not required for single instance servers or
-servers on multiple physical systems. The starting port is `27015` and you can go up or down from there (required/optional)
-
-**BYPASS_MAIN_NODE**: Only useful for testing. If you have multiple instances in `SHARED` mode and you want to start a map that
-isn't the main node, use this to enable mod updates and configuration changes through launching a non-main node instance
+| Variable Name | Description |
+| ------------- | ----------- |
+| CLUSTER_ID | This will be your cluster ID and must be the same for all instances (optional) |
+| SESSION_NAME | The session name for your cluster/server, this will show in the server browser (required) |
+| MAP_NAME | The map to run on the server (required) |
+| MAIN_NODE | The `container name` of the main server node which will handle all downloading and initial configuration. This is optional for `CHONKY` mode but required for `SHARED` mode. All instances will need this variable set **except** the actual main node (optional/required) |
+| MODS | A comma delimited list of mods to add to the cluster. Only the main node needs this defined in `SHARED` mode but all instances need this in `CHONKY` mode (optional) |
+| OPERATORS | A comma delimited list of [Steam64 IDs](https://steamid.io/) for users you want to have admin access (optional) |
+| WHITELIST | A comma delimited list of [Steam64 IDs](https://steamid.io/) for users you want to access your servers. By itself this does not do anything but allow people to bypass login queues, use this combined with `EXCLUSIVE_JOIN` to lock your server down to only allow certain players to login (optional) |
+| EXCLUSIVE_JOIN | Set to `'true'` to make your server only accessible to users you specify in `WHITELIST` (optional) |
+| OPT_* | [? command line arguments](https://ark.gamepedia.com/Server_Configuration#Command_line_arguments) to pass to the ark server on the command line. For example, to specify the option `?NonPermanentDiseases` you would add `OPT_NonPermanentDiseases` to your environment variables (optional) |
+| OPT_Port | This is a special OPT variable that is required when running multiple instances on the same physical server. This *UDP* port should initially be `7777` and increment by 2 for each additional server. For example, if you have 3 servers your OPT_Port variable would be set to `7777`, `7779`, and `77781`. Don't forget to map your ports if using bridge mode in docker (optional/required) |
+| OPT_QueryPort | *UDP* Port used for the steam server browser and discovery. This is not required for single instance servers or servers on multiple physical systems. The starting port is `27015` and you can go up or down from there (required/optional) |
+| BYPASS_MAIN_NODE | Only useful for testing. If you have multiple instances in `SHARED` mode and you want to start a map that isn't the main node, use this to enable mod updates and configuration changes through launching a non-main node instance |
 
 #### A Note on OPT_QueryPort and The Steam Browser
 Steam will be able to see your game sessions through the server browser if you add it to favorites but it will only see around 6 of the
@@ -88,11 +70,10 @@ Ark as root, just use the id 0:0
 This image runs as non-root and does not provide chown functionality for mapped volumes. You will need to ensure that the user
 has read/write access to the directory. Logs will show an error if the directory is not writable
 
-**/server**: The main instance/cluster directory. In `SHARED` mode this can be anything and all instances
-should be set to map the same directory. In `CHONKY` mode, you must specify unique directories for each map
-(eg. /data/the_island:/server, /data/the_center:/server)
-
-**/cluster**: Directory to share data between running Ark instances. This is only required in `CHONKY` mode
+| Volume | Description |
+| ------ | ----------- |
+| /server | The main instance/cluster directory. In `SHARED` mode this can be anything and all instances should be set to map the same directory. In `CHONKY` mode, you must specify unique directories for each map (eg. /data/the_island:/server, /data/the_center:/server) |
+| /cluster | Directory to share data between running Ark instances. This is only required in `CHONKY` mode |
 
 ## Updates
 The image will automatically update Ark to the latest server version as well as download any updates to mods. It will
