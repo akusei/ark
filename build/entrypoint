@@ -99,10 +99,9 @@ else
   echo "the main node and port if different from the default of 27015"
 
   while :; do
-    (echo -n -e \\xFF\\xFF\\xFF\\xFFTSource Engine Query\\x00\\xFF | \
-      nc -u ${nodeInfo[0]} ${port} > /tmp/data.bin 2> /dev/null) &
+    echo -n -e \\xFF\\xFF\\xFF\\xFFTSource Engine Query\\x00\\xFF | \
+      nc -u ${nodeInfo[0]} ${port} > /tmp/data.bin 2> /dev/null &
     pid=$!
-    disown
 
     sleep 3s
 

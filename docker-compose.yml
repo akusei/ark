@@ -7,12 +7,13 @@ version: '3.8'
 x-cluster-env: &cluster-env
   CLUSTER_ID: NUGGIES
   SESSION_NAME: Dino Shaped Chicken Nuggies
+  EXCLUSIVE_JOIN: 'true'
 
 x-main-node: &main-node
   MAIN_NODE: ark_island
 
 x-mods: &mods
-  MODS: 618916953,731604991,751991809,718873660,1957185915
+  MODS: 618916953,731604991,751991809,718873660,1957185915,1609138312,1404697612,924933745,1910733780,2121213202
 
 # Whitelist and Operators defined in docker-compose.override.yml
 
